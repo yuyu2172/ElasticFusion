@@ -657,6 +657,8 @@ void rgbStep(const DeviceArray2D<DataTerm> & corresImg,
 
     reduceSum<<<1, MAX_THREADS>>>(sum, out, blocks);
 
+    std::cout<< "blocks " << blocks << "threads " << threads << "\n";
+
     cudaSafeCall(cudaGetLastError());
     cudaSafeCall(cudaDeviceSynchronize());
 
@@ -773,7 +775,7 @@ struct RGBResidual
 
         int2 value = {0, 0};
 
-        DataTerm corres;
+        DataTerm corres;  // short2 short2 float bool
 
         corres.valid = false;
 
@@ -910,6 +912,9 @@ void computeRgbResidual(const float & minScale,
     rgb.rows = rows;
     rgb.pitch = dIdx.step();
     rgb.imgPitch = nextImage.step();
+    std::cout << " pitch " << rgb.pitch  << " imgPitch " << rgb.imgPitch << "\n";
+    std::cout << " cols " << rgb.cols  << " rows " << rgb.rows << "\n";
+    std::cout << " blocks " << blocks  << " threads " << threads << "\n";
 
     rgb.N = cols * rows;
     rgb.out = sumResidual;
@@ -932,6 +937,7 @@ void computeRgbResidual(const float & minScale,
 
     count = out_host.x;
     sigmaSum = out_host.y;
+    std::cout << "count " << count << " sum " << sigmaSum << "\n";
 }
 
 struct SO3Reduction

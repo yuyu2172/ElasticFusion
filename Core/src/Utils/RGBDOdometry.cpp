@@ -18,6 +18,24 @@
 
 #include "RGBDOdometry.h"
 
+#include"cnpy.h"
+#include <cuda_profiler_api.h>
+
+template<typename T>
+void save(DeviceArray2D<T> dev_arr, std::string filename) {
+
+    cudaSafeCall(cudaDeviceSynchronize());
+    T* host_arr;
+    int H = dev_arr.rows();
+    int W = dev_arr.cols();
+    host_arr = new T[H * W * sizeof(T)];
+    // std::cout << "size " << sizeof(T) << "\n";
+    // std::cout << nextImage[0].cols() << " " << nextImage[0].elem_size << "\n";
+    dev_arr.download(host_arr, W * sizeof(T));
+    cnpy::npy_save(filename, &host_arr[0], {H, W}, "w");
+}
+
+
 RGBDOdometry::RGBDOdometry(int width,
                            int height,
                            float cx, float cy, float fx, float fy,
@@ -123,19 +141,29 @@ void RGBDOdometry::initICP(GPUTexture * filteredDepth, const float depthCutoff)
 
     cudaGraphicsSubResourceGetMappedArray(&textPtr, filteredDepth->cudaRes, 0, 0);
 
-    cudaMemcpy2DFromArray(depth_tmp[0].ptr(0), depth_tmp[0].step(), textPtr, 0, 0, depth_tmp[0].colsBytes(), depth_tmp[0].rows(), cudaMemcpyDeviceToDevice);
+    cudaMemcpy2DFromArray(
+            depth_tmp[0].ptr(0), depth_tmp[0].step(), textPtr, 0, 0,
+            depth_tmp[0].colsBytes(), depth_tmp[0].rows(),
+            cudaMemcpyDeviceToDevice);
 
     cudaGraphicsUnmapResources(1, &filteredDepth->cudaRes);
 
     for(int i = 1; i < NUM_PYRS; ++i)
     {
         pyrDown(depth_tmp[i - 1], depth_tmp[i]);
+        // save(depth_tmp[i-1], "depth_pyr_down.npy");
+        // save(depth_tmp[i], "depth_pyr_down_output.npy");
     }
 
     for(int i = 0; i < NUM_PYRS; ++i)
     {
+        // save(depth_tmp[i], "depth_vmap.npy");
+        // save(vmaps_curr_[i], "vmaps_curr_before.npy");
         createVMap(intr(i), depth_tmp[i], vmaps_curr_[i], depthCutoff);
+        // save(vmaps_curr_[i], "vmaps_curr_create.npy");
+        // save(nmaps_curr_[i], "nmaps_curr_before.npy");
         createNMap(vmaps_curr_[i], nmaps_curr_[i]);
+        // save(nmaps_curr_[i], "nmaps_curr_create.npy");
     }
 
     cudaDeviceSynchronize();
@@ -187,7 +215,10 @@ void RGBDOdometry::initICPModel(GPUTexture * predictedVertices,
 
     for(int i = 1; i < NUM_PYRS; ++i)
     {
+        //save(vmaps_g_prev_[i-1], "vmaps_initICP.npy");
+        //save(vmaps_g_prev_[i], "vmaps_initICP_output_before.npy");
         resizeVMap(vmaps_g_prev_[i - 1], vmaps_g_prev_[i]);
+        // save(vmaps_g_prev_[i], "vmasp_initICP_output.npy");
         resizeNMap(nmaps_g_prev_[i - 1], nmaps_g_prev_[i]);
     }
 
@@ -197,9 +228,16 @@ void RGBDOdometry::initICPModel(GPUTexture * predictedVertices,
     mat33 device_Rcam = Rcam;
     float3 device_tcam = *reinterpret_cast<float3*>(tcam.data());
 
+    
+    cnpy::npy_save("Rcam_transform_maps.npy", Rcam.cast<float>().eval().data(), {3, 3}, "w", "C");
+    cnpy::npy_save("tcam_transform_maps.npy", tcam.cast<float>().eval().data(), {3}, "w", "C");
     for(int i = 0; i < NUM_PYRS; ++i)
     {
+        // save(vmaps_g_prev_[i], "vmaps_g_prev_transform_maps.npy");
+        // save(nmaps_g_prev_[i], "nmaps_g_prev_transform_maps.npy");
         tranformMaps(vmaps_g_prev_[i], nmaps_g_prev_[i], device_Rcam, device_tcam, vmaps_g_prev_[i], nmaps_g_prev_[i]);
+        // save(vmaps_g_prev_[i], "vmaps_g_prev_transform_maps_output.npy");
+        // save(nmaps_g_prev_[i], "nmaps_g_prev_transform_maps_output.npy");
     }
 
     cudaDeviceSynchronize();
@@ -213,7 +251,9 @@ void RGBDOdometry::populateRGBDData(GPUTexture * rgb,
 
     for(int i = 0; i + 1 < NUM_PYRS; i++)
     {
+        save(destDepths[i], "pyrDownFGauss_input.npy");
         pyrDownGaussF(destDepths[i], destDepths[i + 1]);
+        save(destDepths[i + 1], "pyrDownFGauss_output.npy");
     }
 
     cudaArray * textPtr;
@@ -228,7 +268,9 @@ void RGBDOdometry::populateRGBDData(GPUTexture * rgb,
 
     for(int i = 0; i + 1 < NUM_PYRS; i++)
     {
+        // save(destImages[i], "pyrDownUcharGauss_input.npy");
         pyrDownUcharGauss(destImages[i], destImages[i + 1]);
+        // save(destImages[i+1], "pyrDownUcharGauss_output.npy");
     }
 
     cudaDeviceSynchronize();
@@ -263,6 +305,8 @@ void RGBDOdometry::initFirstRGB(GPUTexture * rgb)
         pyrDownUcharGauss(lastNextImage[i], lastNextImage[i + 1]);
     }
 }
+
+
 
 void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                                                 Eigen::Matrix<float, 3, 3, Eigen::RowMajor> & rot,
@@ -310,6 +354,9 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
 
         Eigen::Matrix<double, 3, 3, Eigen::RowMajor> lastResultR = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>::Identity();
 
+        save(lastNextImage[pyramidLevel], "lastNextImage.npy");
+        save(nextImage[pyramidLevel], "nextImage.npy");
+        cnpy::npy_save("k.npy", K.cast<float>().eval().data(), {3, 3}, "w", "C");
         for(int i = 0; i < 10; i++)
         {
             Eigen::Matrix<float, 3, 3, Eigen::RowMajor> jtj;
@@ -327,6 +374,9 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             Eigen::Matrix<double, 3, 3, Eigen::RowMajor> K_R_lr = K * resultR;
             mat33 krlr;
             memcpy(&krlr.data[0], K_R_lr.cast<float>().eval().data(), sizeof(mat33));
+            cnpy::npy_save("imageBasis.npy", homography.cast<float>().eval().data(), {3, 3}, "w", "C");
+            cnpy::npy_save("kinv.npy", K_inv.cast<float>().eval().data(), {3, 3}, "w", "C");
+            cnpy::npy_save("krlr.npy", K_R_lr.cast<float>().eval().data(), {3, 3}, "w", "C");
 
             float residual[2];
 
@@ -344,6 +394,9 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                     GPUConfig::getInstance().so3StepThreads,
                     GPUConfig::getInstance().so3StepBlocks);
             TOCK("so3Step");
+            cnpy::npy_save("jtj.npy", jtj.cast<float>().eval().data(), {3, 3}, "w", "C");
+            cnpy::npy_save("jtr.npy", jtr.cast<float>().eval().data(), {3, 1}, "w", "C");
+            // throw std::invalid_argument("a");
 
             lastSO3Error = sqrt(residual[0]) / residual[1];
             lastSO3Count = residual[1];
@@ -351,10 +404,12 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             //Converged
             if(lastSO3Error < lastError && lastCount == lastSO3Count)
             {
+                std::cout<< "converged \n";
                 break;
             }
             else if(lastSO3Error > lastError + 0.001) //Diverging
             {
+                std::cout<< "diverging \n";
                 lastSO3Error = lastError;
                 lastSO3Count = lastCount;
                 resultR = lastResultR;
@@ -366,8 +421,10 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             lastResultR = resultR;
 
             Eigen::Vector3f delta = jtj.ldlt().solve(jtr);
+            std::cout <<delta(0) << " " << delta(1) << " " << delta(2) << " delta \n";
 
             Eigen::Matrix<double, 3, 3, Eigen::RowMajor> rotUpdate = OdometryProvider::rodrigues(delta.cast<double>());
+            std::cout<< rotUpdate<< "\n\n";
 
             R_lr = rotUpdate.cast<float>() * R_lr;
 
@@ -380,12 +437,14 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             }
         }
     }
+    cnpy::npy_save("resultR.npy", resultR.cast<float>().eval().data(), {3, 3}, "w", "C");
 
     iterations[0] = fastOdom ? 3 : 10;
     iterations[1] = pyramid ? 5 : 0;
     iterations[2] = pyramid ? 4 : 0;
 
     Eigen::Matrix<float, 3, 3, Eigen::RowMajor> Rprev_inv = Rprev.inverse();
+    std::cout << " Rprev_inv " << Rprev_inv << "\n";
     mat33 device_Rprev_inv = Rprev_inv;
     float3 device_tprev = *reinterpret_cast<float3*>(tprev.data());
 
@@ -406,6 +465,7 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
     {
         if(rgb)
         {
+            save(lastDepth[i], "lastDepth_2.npy");
             projectToPointCloud(lastDepth[i], pointClouds[i], intr, i);
         }
 
@@ -416,9 +476,11 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
         K(0, 2) = intr(i).cx;
         K(1, 2) = intr(i).cy;
         K(2, 2) = 1;
+        cnpy::npy_save("k_2.npy", K.cast<float>().eval().data(), {3, 3}, "w", "C");
 
         lastRGBError = std::numeric_limits<float>::max();
 
+        cnpy::npy_save("resultRt.npy", resultRt.cast<float>().eval().data(), {4, 4}, "w", "C");
         for(int j = 0; j < iterations[i]; j++)
         {
             Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Rt = resultRt.inverse();
@@ -438,7 +500,16 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
 
             if(rgb)
             {
+                save(lastDepth[i], "lastDepth_3.npy");
+                save(nextDepth[i], "nextDepth_3.npy");
+                save(nextdIdx[i], "nextdIdx_3.npy");
+                save(nextdIdy[i], "nextdIdy_3.npy");
+                save(lastImage[i], "lastImage_3.npy");
+                save(nextImage[i], "nextImage_3.npy");
                 TICK("computeRgbResidual");
+                std::cout << "minimumGradient " << minimumGradientMagnitudes[i] << " sobelScale " << sobelScale << "\n";
+                std::cout << pow(minimumGradientMagnitudes[i], 2.0) / pow(sobelScale, 2.0) << "\n";
+                std::cout << "maxDepthRGB " << maxDepthDeltaRGB << "\n";
                 computeRgbResidual(pow(minimumGradientMagnitudes[i], 2.0) / pow(sobelScale, 2.0),
                                    nextdIdx[i],
                                    nextdIdy[i],
@@ -457,6 +528,7 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                                    GPUConfig::getInstance().rgbResBlocks);
                 TOCK("computeRgbResidual");
             }
+            // save(corresImg[i], "corresImage_3.npy");
 
             float sigmaVal = std::sqrt((float)sigma / rgbSize == 0 ? 1 : rgbSize);
             float rgbError = std::sqrt(sigma) / (rgbSize == 0 ? 1 : rgbSize);
@@ -490,6 +562,16 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
 
             if(icp)
             {
+                // Pose calculated in the previous iteration (NOT the intermediate values)
+                // cnpy::npy_save("icp_Rcurr.npy", Rcurr.cast<float>().eval().data(), {3, 3}, "w", "C");
+                // cnpy::npy_save("tcurr.npy", tcurr.cast<float>().eval().data(), {3}, "w", "C");
+                // cnpy::npy_save("Rprev_inv.npy", Rprev_inv.cast<float>().eval().data(), {3, 3}, "w", "C");
+                // cnpy::npy_save("tprev.npy", tprev.cast<float>().eval().data(), {3}, "w", "C");
+
+                // save(vmap_curr, "vmap_curr.npy");
+                // save(nmap_curr, "nmap_curr.npy");
+                // save(vmap_g_prev, "vmap_g_prev.npy");
+                // save(nmap_g_prev, "nmap_g_prev.npy");
                 TICK("icpStep");
                 icpStep(device_Rcurr,
                         device_tcurr,
@@ -510,6 +592,8 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                         GPUConfig::getInstance().icpStepThreads,
                         GPUConfig::getInstance().icpStepBlocks);
                 TOCK("icpStep");
+                // cnpy::npy_save("A_icp.npy", A_icp.cast<float>().eval().data(), {6, 6}, "w", "C");
+                // cnpy::npy_save("B_icp.npy", b_icp.cast<float>().eval().data(), {6, 1}, "w", "C");
             }
 
             lastICPError = sqrt(residual[0]) / residual[1];
@@ -521,6 +605,10 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             if(rgb)
             {
                 TICK("rgbStep");
+                save(nextdIdx[i], "nextdIdx_rgbdstep.npy");
+                save(nextdIdy[i], "nextdIdy_rgbdstep.npy");
+                std::cout << " sobelScale " << sobelScale << " \n";
+                std::cout << " sigmaVal " << sigmaVal << " \n";
                 rgbStep(corresImg[i],
                         sigmaVal,
                         pointClouds[i],
@@ -536,6 +624,10 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
                         GPUConfig::getInstance().rgbStepThreads,
                         GPUConfig::getInstance().rgbStepBlocks);
                 TOCK("rgbStep");
+                cnpy::npy_save("A_rgbd.npy", A_rgbd.cast<float>().eval().data(), {6, 6}, "w", "C");
+                cnpy::npy_save("B_rgbd.npy", b_rgbd.cast<float>().eval().data(), {6}, "w", "C");
+                cudaProfilerStop();
+                throw std::invalid_argument("a");
             }
 
             Eigen::Matrix<double, 6, 1> result;

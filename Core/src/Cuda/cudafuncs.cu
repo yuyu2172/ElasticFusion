@@ -54,7 +54,8 @@
 #include "operators.cuh"
 
 
-__global__ void pyrDownGaussKernel (const PtrStepSz<unsigned short> src, PtrStepSz<unsigned short> dst, float sigma_color)
+__global__ void pyrDownGaussKernel (const PtrStepSz<unsigned short> src,
+        PtrStepSz<unsigned short> dst, float sigma_color)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -143,6 +144,7 @@ void createVMap(const CameraModel& intr, const DeviceArray2D<unsigned short> & d
 
     float fx = intr.fx, cx = intr.cx;
     float fy = intr.fy, cy = intr.cy;
+    std::cout<< "depthCutOff " << depthCutoff << " fx " << fx << " fy " << fy << " cx " << cx << " cy " << cy << "\n";
 
     computeVmapKernel<<<grid, block>>>(depth, vmap, 1.f / fx, 1.f / fy, cx, cy, depthCutoff);
     cudaSafeCall (cudaGetLastError ());
@@ -383,6 +385,7 @@ __global__ void resizeMapKernel(int drows, int dcols, int srows, const PtrStep<f
 
     if (isnan (x00) || isnan (x01) || isnan (x10) || isnan (x11))
     {
+        // printf("%d ", input.step_);
         output.ptr (y)[x] = qnan;
         return;
     }
@@ -431,6 +434,7 @@ void resizeMap(const DeviceArray2D<float>& input, DeviceArray2D<float>& output)
     resizeMapKernel<normalize><< < grid, block>>>(out_rows, out_cols, in_rows, input, output);
     cudaSafeCall ( cudaGetLastError () );
     cudaSafeCall (cudaDeviceSynchronize ());
+    std::cout << " Ohaaa  "<<input.step() << " " << input.cols() << " " << output.step() << " " << output.cols() << "\n";
 }
 
 void resizeVMap(const DeviceArray2D<float>& input, DeviceArray2D<float>& output)
@@ -667,7 +671,10 @@ void projectToPointCloud(const DeviceArray2D<float> & depth,
 
     CameraModel intrinsicsLevel = intrinsics(level);
 
-    projectPointsKernel<<<grid, block>>>(depth, cloud, 1.0f / intrinsicsLevel.fx, 1.0f / intrinsicsLevel.fy, intrinsicsLevel.cx, intrinsicsLevel.cy);
+    projectPointsKernel<<<grid, block>>>(
+            depth, cloud, 1.0f / intrinsicsLevel.fx,
+            1.0f / intrinsicsLevel.fy,
+            intrinsicsLevel.cx, intrinsicsLevel.cy);
     cudaSafeCall ( cudaGetLastError () );
     cudaSafeCall (cudaDeviceSynchronize ());
 }

@@ -43,6 +43,7 @@ class OdometryProvider
             rz = src(2);
 
             theta = src.norm();
+            std::cout << theta<< " theta \n";
 
             if(theta >= DBL_EPSILON)
             {

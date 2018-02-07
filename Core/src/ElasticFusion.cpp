@@ -17,6 +17,7 @@
  */
  
 #include "ElasticFusion.h"
+#include"cnpy.h"
 
 ElasticFusion::ElasticFusion(const int timeDelta,
                              const int countThresh,
@@ -261,6 +262,12 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
                                  const bool bootstrap)
 {
     TICK("Run");
+    // int height = Resolution::getInstance().height();
+    // int width = Resolution::getInstance().width();
+    // cnpy::npy_save("rgb.npy", &rgb[0],{height, width, 3},"w");
+    // cnpy::npy_save("depth.npy",&depth[0],{height, width},"w");
+    // throw std::invalid_argument("ooooo");
+    std::cout << "tick " << tick << "\n";
 
     textures[GPUTexture::DEPTH_RAW]->texture->Upload(depth, GL_LUMINANCE_INTEGER_EXT, GL_UNSIGNED_SHORT);
     textures[GPUTexture::RGB]->texture->Upload(rgb, GL_RGB, GL_UNSIGNED_BYTE);

@@ -14,6 +14,8 @@ include_directories(${Pangolin_INCLUDE_DIRS})
 include_directories(${CUDA_INCLUDE_DIRS})
 include_directories(${EIGEN_INCLUDE_DIRS})
 include_directories(${SUITESPARSE_INCLUDE_DIRS})
+include_directories(/home/leus/projects/cnpy)
+link_directories(/home/leus/projects/cnpy/build)
 
 file(GLOB srcs *.cpp)
 file(GLOB utils_srcs Utils/*.cpp)
@@ -73,6 +75,7 @@ target_link_libraries(efusion
                       ${Pangolin_LIBRARIES}
                       ${CUDA_LIBRARIES}
                       ${SUITESPARSE_LIBRARIES}
+                      cnpy
 					  ${EXTRA_WINDOWS_LIBS}
 )
 
