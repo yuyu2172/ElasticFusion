@@ -33,35 +33,26 @@ void DebugMainController::run()
                 if(rewind)
                 {
                     if(!logReader->hasMore())
-                    {
                         logReader->getBack();
-                    }
                     else
-                    {
                         logReader->getNext();
-                    }
 
                     if(logReader->rewound())
-                    {
                         logReader->currentFrame = 0;
-                    }
                 }
-                else
-                {
+                else {
                     logReader->getNext();
                 }
                 TOCK("LogRead");
 
-                if(eFusion->getTick() < start)
-                {
+                if(eFusion->getTick() < start) {
                     eFusion->setTick(start);
                     logReader->fastForward(start);
                 }
 
                 float weightMultiplier = framesToSkip + 1;
 
-                if(framesToSkip > 0)
-                {
+                if(framesToSkip > 0) {
                     eFusion->setTick(eFusion->getTick() + framesToSkip);
                     logReader->fastForward(logReader->currentFrame + framesToSkip);
                     framesToSkip = 0;
@@ -79,25 +70,19 @@ void DebugMainController::run()
                 eFusion->processFrame(logReader->rgb, logReader->depth, logReader->timestamp, currentPose, weightMultiplier);
 
                 if(currentPose)
-                {
                     delete currentPose;
-                }
 
                 if(frameskip && Stopwatch::getInstance().getTimings().at("Run") > 1000.f / 30.f)
-                {
                     framesToSkip = int(Stopwatch::getInstance().getTimings().at("Run") / (1000.f / 30.f));
-                }
             }
         }
-        else
-        {
+        else {
             eFusion->predict();
         }
 
         TICK("GUI");
 
-        if(gui->followPose->Get())
-        {
+        if(gui->followPose->Get()) {
             pangolin::OpenGlMatrix mv;
 
             Eigen::Matrix4f currPose = eFusion->getCurrPose();
@@ -141,36 +126,38 @@ void DebugMainController::run()
         stre << (std::isnan(eFusion->getModelToModel().lastICPError) ? 0 : eFusion->getModelToModel().lastICPError);
         gui->trackRes->Ref().Set(stre.str());
 
-        if(!gui->pause->Get())
-        {
+        if(!gui->pause->Get()) {
             gui->resLog.Log((std::isnan(eFusion->getModelToModel().lastICPError) ? std::numeric_limits<float>::max() : eFusion->getModelToModel().lastICPError), icpErrThresh);
             gui->inLog.Log(eFusion->getModelToModel().lastICPCount, icpCountThresh);
         }
 
         Eigen::Matrix4f pose = eFusion->getCurrPose();
 
-        if(gui->drawRawCloud->Get() || gui->drawFilteredCloud->Get())
-        {
+        if(gui->drawRawCloud->Get() || gui->drawFilteredCloud->Get()) {
             eFusion->computeFeedbackBuffers();
         }
 
-        if(gui->drawRawCloud->Get())
-        {
-            eFusion->getFeedbackBuffers().at(FeedbackBuffer::RAW)->render(gui->s_cam.GetProjectionModelViewMatrix(), pose, gui->drawNormals->Get(), gui->drawColors->Get());
+        if(gui->drawRawCloud->Get()) {
+            eFusion->getFeedbackBuffers().at(FeedbackBuffer::RAW)->render(
+                    gui->s_cam.GetProjectionModelViewMatrix(),
+                    pose,
+                    gui->drawNormals->Get(),
+                    gui->drawColors->Get());
         }
 
-        if(gui->drawFilteredCloud->Get())
-        {
-            eFusion->getFeedbackBuffers().at(FeedbackBuffer::FILTERED)->render(gui->s_cam.GetProjectionModelViewMatrix(), pose, gui->drawNormals->Get(), gui->drawColors->Get());
+        if(gui->drawFilteredCloud->Get()) {
+            eFusion->getFeedbackBuffers().at(FeedbackBuffer::FILTERED)->render(
+                    gui->s_cam.GetProjectionModelViewMatrix(),
+                    pose,
+                    gui->drawNormals->Get(),
+                    gui->drawColors->Get());
         }
 
-        if(gui->drawGlobalModel->Get())
-        {
+        if(gui->drawGlobalModel->Get()) {
             glFinish();
             TICK("Global");
 
-            if(gui->drawFxaa->Get())
-            {
+            if(gui->drawFxaa->Get()) {
                 gui->drawFXAA(gui->s_cam.GetProjectionModelViewMatrix(),
                               gui->s_cam.GetModelViewMatrix(),
                               eFusion->getGlobalModel().model(),
@@ -179,8 +166,7 @@ void DebugMainController::run()
                               eFusion->getTimeDelta(),
                               iclnuim);
             }
-            else
-            {
+            else {
                 eFusion->getGlobalModel().renderPointCloud(gui->s_cam.GetProjectionModelViewMatrix(),
                                                            eFusion->getConfidenceThreshold(),
                                                            gui->drawUnstable->Get(),
@@ -196,14 +182,11 @@ void DebugMainController::run()
             TOCK("Global");
         }
 
+        // Draw Frustrum
         if(eFusion->getLost())
-        {
             glColor3f(1, 1, 0);
-        }
         else
-        {
             glColor3f(1, 0, 1);
-        }
         gui->drawFrustum(pose);
         glColor3f(1, 1, 1);
 
@@ -243,8 +226,7 @@ void DebugMainController::run()
             }
         }
 
-        if(eFusion->getFerns().lastClosest != -1)
-        {
+        if(eFusion->getFerns().lastClosest != -1) {
             glColor3f(1, 0, 0);
             gui->drawFrustum(eFusion->getFerns().frames.at(eFusion->getFerns().lastClosest)->pose);
             glColor3f(1, 1, 1);
@@ -252,14 +234,14 @@ void DebugMainController::run()
 
         const std::vector<PoseMatch> & poseMatches = eFusion->getPoseMatches();
 
-        int maxDiff = 0;
-        for(size_t i = 0; i < poseMatches.size(); i++)
-        {
-            if(poseMatches.at(i).secondId - poseMatches.at(i).firstId > maxDiff)
-            {
-                maxDiff = poseMatches.at(i).secondId - poseMatches.at(i).firstId;
-            }
-        }
+        // int maxDiff = 0;
+        // for(size_t i = 0; i < poseMatches.size(); i++)
+        // {
+        //     if(poseMatches.at(i).secondId - poseMatches.at(i).firstId > maxDiff)
+        //     {
+        //         maxDiff = poseMatches.at(i).secondId - poseMatches.at(i).firstId;
+        //     }
+        // }
 
         for(size_t i = 0; i < poseMatches.size(); i++)
         {
@@ -275,8 +257,13 @@ void DebugMainController::run()
                 }
                 for(size_t j = 0; j < poseMatches.at(i).constraints.size(); j++)
                 {
-                    pangolin::glDrawLine(poseMatches.at(i).constraints.at(j).sourcePoint(0), poseMatches.at(i).constraints.at(j).sourcePoint(1), poseMatches.at(i).constraints.at(j).sourcePoint(2),
-                                         poseMatches.at(i).constraints.at(j).targetPoint(0), poseMatches.at(i).constraints.at(j).targetPoint(1), poseMatches.at(i).constraints.at(j).targetPoint(2));
+                    pangolin::glDrawLine(
+                            poseMatches.at(i).constraints.at(j).sourcePoint(0),
+                            poseMatches.at(i).constraints.at(j).sourcePoint(1),
+                            poseMatches.at(i).constraints.at(j).sourcePoint(2),
+                            poseMatches.at(i).constraints.at(j).targetPoint(0),
+                            poseMatches.at(i).constraints.at(j).targetPoint(1),
+                            poseMatches.at(i).constraints.at(j).targetPoint(2));
                 }
             }
         }
@@ -284,50 +271,56 @@ void DebugMainController::run()
 
         eFusion->normaliseDepth(0.3f, gui->depthCutoff->Get());
 
-        for(std::map<std::string, GPUTexture*>::const_iterator it = eFusion->getTextures().begin(); it != eFusion->getTextures().end(); ++it)
-        {
-            if(it->second->draw)
-            {
-                gui->displayImg(it->first, it->second);
+        // for(std::map<std::string, GPUTexture*>::const_iterator it = eFusion->getTextures().begin();
+        //         it != eFusion->getTextures().end();
+        //         ++it)
+        // {
+        //     if(it->second->draw)
+        //     {
+        //         gui->displayImg(it->first, it->second);
+        //     }
+        // }
+        for (auto const& tup : eFusion->getTextures()) {
+            if (tup.second->draw) {
+                gui->displayImg(tup.first, tup.second);
             }
         }
 
-        eFusion->getIndexMap().renderDepth(gui->depthCutoff->Get());
+        // Model Image Related
+        auto& index_map = eFusion->getIndexMap();
+        index_map.renderDepth(gui->depthCutoff->Get());
+        gui->displayImg("ModelImg", index_map.imageTex());
+        gui->displayImg("Model", index_map.drawTex());
 
-        gui->displayImg("ModelImg", eFusion->getIndexMap().imageTex());
-        gui->displayImg("Model", eFusion->getIndexMap().drawTex());
+        // Post Call
+        gui->postCall();
 
+        /*
+        / Update Parameters
+        */
         std::stringstream strs;
         strs << eFusion->getGlobalModel().lastCount();
-
         gui->totalPoints->operator=(strs.str());
 
         std::stringstream strs2;
         strs2 << eFusion->getLocalDeformation().getGraph().size();
-
         gui->totalNodes->operator=(strs2.str());
 
         std::stringstream strs3;
         strs3 << eFusion->getFerns().frames.size();
-
         gui->totalFerns->operator=(strs3.str());
 
         std::stringstream strs4;
         strs4 << eFusion->getDeforms();
-
         gui->totalDefs->operator=(strs4.str());
 
         std::stringstream strs5;
         strs5 << eFusion->getTick() << "/" << logReader->getNumFrames();
-
         gui->logProgress->operator=(strs5.str());
 
         std::stringstream strs6;
         strs6 << eFusion->getFernDeforms();
-
         gui->totalFernDefs->operator=(strs6.str());
-
-        gui->postCall();
 
         logReader->flipColors = gui->flipColors->Get();
         eFusion->setRgbOnly(gui->rgbOnly->Get());
@@ -339,28 +332,27 @@ void DebugMainController::run()
         eFusion->setSo3(gui->so3->Get());
         eFusion->setFrameToFrameRGB(gui->frameToFrameRGB->Get());
 
-        resetButton = pangolin::Pushed(*gui->reset);
-
         if(gui->autoSettings)
         {
+            std::cout << "autoSettings \n";
             static bool last = gui->autoSettings->Get();
 
             if(gui->autoSettings->Get() != last)
             {
                 last = gui->autoSettings->Get();
-                static_cast<LiveLogReader *>(logReader)->setAuto(last);
+                static_cast<LiveLogReader*>(logReader)->setAuto(last);
             }
         }
 
         Stopwatch::getInstance().sendAll();
 
-        if(resetButton)
-        {
+        // Reset
+        resetButton = pangolin::Pushed(*gui->reset);
+        if(resetButton) {
             break;
         }
-
-        if(pangolin::Pushed(*gui->save))
-        {
+        // Save
+        if(pangolin::Pushed(*gui->save)) {
             eFusion->savePly();
         }
 
