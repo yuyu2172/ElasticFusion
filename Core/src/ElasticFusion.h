@@ -231,6 +231,10 @@ class ElasticFusion
          */
         EFUSION_API const int & getFernDeforms();
 
+        EFUSION_API const float getIcpErrThresh() {return icpErrThresh;}
+
+        EFUSION_API const int getIcpCountThresh() {return icpCountThresh;}
+
         /**
          * These are the vertex buffers computed from the raw input data
          * @return can be rendered
