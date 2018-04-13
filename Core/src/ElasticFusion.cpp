@@ -253,6 +253,9 @@ bool ElasticFusion::denseEnough(const Img<Eigen::Matrix<unsigned char, 3, 1>> & 
     return float(sum) / float(img.rows * img.cols) > 0.75f;
 }
 
+
+// TODO:  Add score map together with RGB and Depth
+// Score map gets calculated before calling processFrame (probably in MainController)
 void ElasticFusion::processFrame(const unsigned char * rgb,
                                  const unsigned short * depth,
                                  const int64_t & timestamp,

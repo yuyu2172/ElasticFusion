@@ -22,7 +22,7 @@ class DebugMainController
                 )
             : eFusion(elafu),
               gui(gui),
-              logReader(logReader),
+              logReader_(logReader),
               quiet(quiet),
               start(start),
               end(end),
@@ -45,7 +45,7 @@ class DebugMainController
 
         ElasticFusion* eFusion;
         GUI* gui;
-        LogReader* logReader;
+        LogReader* logReader_;
 
         bool quiet;
         int start;

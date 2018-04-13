@@ -14,47 +14,47 @@ DebugMainController::~DebugMainController()
         delete gui;
     }
 
-    if(logReader)
+    if(logReader_)
     {
-        delete logReader;
+        delete logReader_;
     }
 }
 
 
 void DebugMainController::run()
 {
-    while(!pangolin::ShouldQuit() && !((!logReader->hasMore()) && quiet) && !(eFusion->getTick() == end && quiet))
+    while(!pangolin::ShouldQuit() && !((!logReader_->hasMore()) && quiet) && !(eFusion->getTick() == end && quiet))
     {
         if(!gui->pause->Get() || pangolin::Pushed(*gui->step))
         {
-            if((logReader->hasMore() || rewind) && eFusion->getTick() < end)
+            if((logReader_->hasMore() || rewind) && eFusion->getTick() < end)
             {
                 TICK("LogRead");
                 if(rewind)
                 {
-                    if(!logReader->hasMore())
-                        logReader->getBack();
+                    if(!logReader_->hasMore())
+                        logReader_->getBack();
                     else
-                        logReader->getNext();
+                        logReader_->getNext();
 
-                    if(logReader->rewound())
-                        logReader->currentFrame = 0;
+                    if(logReader_->rewound())
+                        logReader_->currentFrame = 0;
                 }
                 else {
-                    logReader->getNext();
+                    logReader_->getNext();
                 }
                 TOCK("LogRead");
 
                 if(eFusion->getTick() < start) {
                     eFusion->setTick(start);
-                    logReader->fastForward(start);
+                    logReader_->fastForward(start);
                 }
 
                 float weightMultiplier = framesToSkip + 1;
 
                 if(framesToSkip > 0) {
                     eFusion->setTick(eFusion->getTick() + framesToSkip);
-                    logReader->fastForward(logReader->currentFrame + framesToSkip);
+                    logReader_->fastForward(logReader_->currentFrame + framesToSkip);
                     framesToSkip = 0;
                 }
 
@@ -67,7 +67,8 @@ void DebugMainController::run()
                 //     *currentPose = groundTruthOdometry->getTransformation(logReader->timestamp);
                 // }
 
-                eFusion->processFrame(logReader->rgb, logReader->depth, logReader->timestamp, currentPose, weightMultiplier);
+                eFusion->processFrame(logReader_->rgb,
+                        logReader_->depth, logReader_->timestamp, currentPose, weightMultiplier);
 
                 if(currentPose)
                     delete currentPose;
@@ -315,14 +316,14 @@ void DebugMainController::run()
         gui->totalDefs->operator=(strs4.str());
 
         std::stringstream strs5;
-        strs5 << eFusion->getTick() << "/" << logReader->getNumFrames();
+        strs5 << eFusion->getTick() << "/" << logReader_->getNumFrames();
         gui->logProgress->operator=(strs5.str());
 
         std::stringstream strs6;
         strs6 << eFusion->getFernDeforms();
         gui->totalFernDefs->operator=(strs6.str());
 
-        logReader->flipColors = gui->flipColors->Get();
+        logReader_->flipColors = gui->flipColors->Get();
         eFusion->setRgbOnly(gui->rgbOnly->Get());
         eFusion->setPyramid(gui->pyramid->Get());
         eFusion->setFastOdom(gui->fastOdom->Get());
@@ -340,7 +341,7 @@ void DebugMainController::run()
             if(gui->autoSettings->Get() != last)
             {
                 last = gui->autoSettings->Get();
-                static_cast<LiveLogReader*>(logReader)->setAuto(last);
+                static_cast<LiveLogReader*>(logReader_)->setAuto(last);
             }
         }
 
