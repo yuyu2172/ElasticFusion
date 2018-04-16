@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.6.0)
 
 project(ElasticFusion)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 
 if(WIN32)
@@ -72,14 +73,43 @@ endif()
 set(CMAKE_CXX_FLAGS ${ADDITIONAL_CMAKE_CXX_FLAGS} "-O3 -msse2 -msse3 -Wall -std=c++11")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -std=c++11")
 
-add_executable(ElasticFusion 
-               ${srcs}
-               ${tools_srcs}
-               ${hdrs}
-               ${tools_hdrs}
-)
+# add_executable(ElasticFusion 
+#                ${srcs}
+#                ${tools_srcs}
+#                ${hdrs}
+#                ${tools_hdrs}
+# )
 
-target_link_libraries(ElasticFusion
+find_package(realsense2)
+# target_link_libraries(ElasticFusion
+# 					  ${EXTRA_WINDOWS_LIBS}
+#                       ${ZLIB_LIBRARY}
+#                       ${Pangolin_LIBRARIES}
+#                       ${CUDA_LIBRARIES}
+#                       ${EXTRA_LIBS}
+#                       ${EFUSION_LIBRARY}
+#                       ${OPENNI2_LIBRARY}
+#                       ${SUITESPARSE_LIBRARIES}
+#                       ${BLAS_LIBRARIES}
+#                       ${LAPACK_LIBRARIES}
+#                       realsense2
+# )
+# 
+# 
+# INSTALL(TARGETS ElasticFusion
+#         RUNTIME DESTINATION bin
+#         LIBRARY DESTINATION lib
+#         ARCHIVE DESTINATION lib
+# )
+
+
+find_package(vis3d)
+find_package(io3d)
+add_subdirectory(External/cnpy)
+add_executable(test_realsense Examples/test_realsense.cpp
+               ${tools_srcs}
+  )
+target_link_libraries(test_realsense  vis3d io3d
 					  ${EXTRA_WINDOWS_LIBS}
                       ${ZLIB_LIBRARY}
                       ${Pangolin_LIBRARIES}
@@ -90,11 +120,5 @@ target_link_libraries(ElasticFusion
                       ${SUITESPARSE_LIBRARIES}
                       ${BLAS_LIBRARIES}
                       ${LAPACK_LIBRARIES}
-)
-
-
-INSTALL(TARGETS ElasticFusion
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-)
+                      realsense2
+                      cnpy)
