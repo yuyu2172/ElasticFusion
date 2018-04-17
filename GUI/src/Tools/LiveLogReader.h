@@ -33,6 +33,7 @@
 #include "LogReader.h"
 #include "CameraInterface.h"
 
+
 class LiveLogReader : public LogReader
 {
 	public:
